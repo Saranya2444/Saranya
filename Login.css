@@ -1,44 +1,97 @@
-/* Login.css */
 body {
+    background-color: #759dcb;
+    object-fit: cover;
+  }
+  
+  .App {
     font-family: Arial, sans-serif;
-    background-color: #f4f4f4;
-    margin: 0;
-    padding: 0;
-}
-h2 {
     text-align: center;
-    color: #333;
-}
-form {
-    width: 300px;
-    margin: 50px auto;
-    padding: 20px;
-    background-color: white;
-    border-radius: 10px;
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
-}
-input[type="text"],
-input[type="password"] {
-    width: calc(100% - 20px);
-    padding: 10px;
-    margin-bottom: 10px;
-    border: 1px solid #ddd;
-    border-radius: 5px;
-}
-button {
-    background-color: #4CAF50;
-    color: white;
-    border: none;
-    padding: 10px;
-    text-align: center;
-    text-decoration: none;
-    display: block;
-    font-size: 16px;
-    margin: 10px 0;
-    cursor: pointer;
-    border-radius: 5px;
+    height: 100vh;
+  }
+  
+  table {
     width: 100%;
-}
-button:hover {
-    background-color: #45a049;
-}
+    height: 90vh;
+    border-collapse: collapse;
+    background-color: #759dcb;
+    transform: translate(0px, 30px);
+  }
+  
+  td {
+    padding: 20px;
+    border: 1px solid #ddd;
+    border: none;
+  }
+  
+  @media (min-width: 600px) {
+    .left-column {
+      width: 30%;
+      vertical-align: top;
+    }
+    .right-column {
+      width: 70%;
+      vertical-align: top;
+    }
+    .formColumn form {
+      height: auto;
+      width: 60%;
+      background: rgba(255, 255, 255, 0.1);
+      backdrop-filter: blur(10px);
+      border-radius: 10px;
+      padding: 30px;
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+      transform: translate(-90px, 0px);
+    }
+  }
+  
+  form {
+    margin: 0 auto;
+    width: 300px;
+    text-align: left;
+  }
+  
+  label {
+    display: block;
+    margin: 10px 0;
+  }
+  
+  input {
+    width: 100%;
+    padding: 8px;
+    margin-top: 5px;
+    box-sizing: border-box;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    background-color: rgba(255, 255, 255, 0.5); /* Transparent background */
+    color: #333; /* Text color */
+  }
+  
+  button {
+    margin-top: 10px;
+    padding: 10px 20px;
+    font-size: 16px;
+    width: 200px;
+    border-radius: 10px;
+    background-color: #084184;
+    color: aliceblue;
+    transform: translate(30px,0px);
+  }
+  
+  .imageColumn img {
+    max-width: 90%;
+    height: auto;
+    transform: translate(70px, 0px);
+  }
+  
+  .forma form {
+    transform: translate(10px, 0px);
+  }
+  
+  h2 {
+    transform: translate(130px, 0px);
+  }
+  
+  #a1 {
+    transform: translate(90px, 0px);
+  }
+  
