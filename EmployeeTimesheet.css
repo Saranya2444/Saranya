@@ -1,0 +1,81 @@
+.timesheet-container {
+    padding: 20px;
+    font-family: Arial, sans-serif;
+}
+
+h1 {
+    text-align: center;
+    color: #333;
+}
+
+.search-bar {
+    display: flex;
+    justify-content: center;
+    margin-bottom: 20px;
+}
+
+.search-bar input {
+    width: 300px;
+    padding: 10px;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    font-size: 16px;
+}
+
+.search-bar i {
+    margin-left: -30px;
+    align-self: center;
+    color: #aaa;
+}
+
+h2 {
+    text-align: center;
+    color: #555;
+}
+
+.timesheet-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 20px;
+}
+
+.timesheet-table th, .timesheet-table td {
+    border: 1px solid #ddd;
+    padding: 8px;
+    text-align: center;
+}
+
+.timesheet-table th {
+    background-color: #f4f4f4;
+    color: #333;
+}
+
+.timesheet-table tr:nth-child(even) {
+    background-color: #f9f9f9;
+}
+
+.timesheet-table tr:hover {
+    background-color: #f1f1f1;
+}
+
+.timesheet-table button {
+    margin: 0 5px;
+    padding: 5px 10px;
+    border: none;
+    border-radius: 3px;
+    cursor: pointer;
+}
+
+.timesheet-table button:hover {
+    opacity: 0.8;
+}
+
+.timesheet-table button:first-child {
+    background-color: #4CAF50;
+    color: white;
+}
+
+.timesheet-table button:last-child {
+    background-color: #f44336;
+    color: white;
+}
