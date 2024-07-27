@@ -1,0 +1,35 @@
+.dashboard {
+    padding: 20px;
+}
+
+.employee-list h2 {
+    margin-top: 20px;
+    margin-bottom: 10px;
+}
+
+.employee-containers,
+.timesheet-containers {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 20px;
+}
+
+.employee-container,
+.timesheet-container {
+    border: 1px solid #ccc;
+    border-radius: 8px;
+    overflow: hidden;
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.employee-container:hover,
+.timesheet-container:hover {
+    transform: scale(1.05);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+}
+
+.employee-detail-link,
+.timesheet-detail-link {
+    display: flex;
+    flex-direction: column;
+}
