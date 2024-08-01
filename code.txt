@@ -1,0 +1,264 @@
+import React, { useState, useEffect } from 'react';
+import { Routes, Route, useNavigate, useLocation } from 'react-router-dom';
+import axios from 'axios';
+import Navbar from './components/Navbar';
+import Sidebar from './components/Sidebar';
+import Sidebars from './components/Sidebars';
+import CalendarTable from './components/CalendarTable';
+import HomePage from './components/HomePage';
+import TeamTable from './components/TeamTable';
+import EmployeeList from './components/EmployeeList';
+import EmployeeDetail from './components/EmployeeDetail';
+import LoginForm from './components/LoginForm';
+import './App.css';
+import EmployeeDashboard from './components/EmployeeDashboard';
+import ManagerDashboard from './components/ManagerDashboard';
+import LeadDashboard from './components/LeadDashboard';
+import Dashboard from './components/Dashboard';
+import Profile from './components/Profile';
+import UpdateTimesheet from './components/UpdateTimesheet';
+import ViewTimesheet from './components/ViewTimesheet';
+
+const App = () => {
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [empid, setEmpid] = useState(null);
+  const [employeeName, setEmployeeName] = useState('');
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  const handleLogin = (empid) => {
+    setEmpid(empid);
+    setIsLoggedIn(true);
+  };
+
+  useEffect(() => {
+    if (empid) {
+      axios.get(`http://127.0.0.1:8000/api/employee-details/${empid}/`)
+        .then(response => {
+          setEmployeeName(response.data.employee_name);
+        })
+        .catch(error => {
+          console.error('There was an error fetching the employee details!', error);
+        });
+    }
+  }, [empid]);
+
+  const handleCalendarClick = () => {
+    navigate('/calendar');
+  };
+
+  const handleSelectEmployee = (employeeId) => {
+    navigate(`/employees/${employeeId}`);
+  };
+
+  if (!isLoggedIn) {
+    return <LoginForm onLogin={handleLogin} />;
+  }
+
+  const showSidebar = !location.pathname.startsWith('/dashboard');
+
+  return (
+    <div className="app">
+      <Navbar />
+      <div className="main-content-container">
+        {showSidebar ? (
+          <Sidebar onCalendarClick={handleCalendarClick} />
+        ) : (
+          <Sidebars onCalendarClick={handleCalendarClick} />
+        )}
+        <div className="main-content">
+          <Routes>
+            <Route path="/login" element={<LoginForm />} />
+            <Route path="/dashboard/*" element={<Dashboard />} />
+            <Route path="/employee-dashboard" element={<EmployeeDashboard />} />
+            <Route path="/manager-dashboard" element={<ManagerDashboard />} />
+            <Route path="/lead-dashboard" element={<LeadDashboard />} />
+            <Route path="/home" element={<HomePage employeeName={employeeName} />} />
+            <Route path="/calendar" element={<CalendarTable empid={empid} employeeName={employeeName} />} />
+            <Route path="/employees" element={<EmployeeList onSelectEmployee={handleSelectEmployee} />} />
+            <Route path="/employees/:id" element={<EmployeeDetail />} />
+            <Route path="/teamtable" element={<TeamTable />} />
+            <Route path="/profile" element={<Profile />} />
+            <Route path="/update-timesheet" element={<UpdateTimesheet />} />
+            <Route path="/view-timesheet" element={<ViewTimesheet />} />
+          </Routes>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default App;
+
+
+
+
+
+
+
+
+
+import React, { useState, useEffect } from 'react';
+import { Routes, Route } from 'react-router-dom';
+import CalendarTable from './CalendarTable';
+import TeamTable from './TeamTable';
+import Profile from './Profile';
+import UpdateTimesheet from './UpdateTimesheet';
+import ViewTimesheet from './ViewTimesheet';
+import axios from 'axios';
+
+const Dashboard = () => {
+  const [empid, setEmpid] = useState(null);
+  const [employeeName, setEmployeeName] = useState('');
+
+  useEffect(() => {
+    if (empid) {
+      axios.get(`http://127.0.0.1:8000/api/employee-details/${empid}`)
+        .then(response => {
+          setEmployeeName(response.data.employee_name);
+        })
+        .catch(error => {
+          console.error('There was an error fetching the employee details!', error);
+        });
+    }
+  }, [empid]);
+
+  return (
+    <div className="dashboard-container">
+      <div className="main-content">
+        <Routes>
+          <Route path="profile" element={<Profile />} />
+          <Route path="update-timesheet" element={<UpdateTimesheet />} />
+          <Route path="view-timesheet" element={<ViewTimesheet />} />
+          <Route path="calendar-table" element={<CalendarTable empid={empid} employeeName={employeeName} />} />
+          <Route path="teamtable" element={<TeamTable />} />
+        </Routes>
+      </div>
+    </div>
+  );
+};
+
+export default Dashboard;
+
+
+
+
+
+
+
+
+
+
+
+import React from 'react';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faClock, faHome, faFileAlt, faChartBar, faTasks, faStar, faUsers, faDollarSign, faCogs } from '@fortawesome/free-solid-svg-icons';
+import { Link } from 'react-router-dom';
+import './Sidebars.css';
+
+const Sidebars = ({ onCalendarClick }) => {
+  return (
+    <div className="sidebar">
+      <div className="sidebar-title">
+        <FontAwesomeIcon icon={faClock} />
+        <span>TIME TITANS</span>
+      </div>
+      <div className="sidebar-search">
+        <input type="text" placeholder="Search..." />
+      </div>
+      <div className="sidebar-menu">
+        <div className="sidebar-item">
+          <FontAwesomeIcon icon={faHome} />
+          <span><Link to="/dashboard/profile" className="sidebar-link">Profile</Link></span>
+        </div>
+        <div className="sidebar-item">
+          <FontAwesomeIcon icon={faFileAlt} />
+          <span><Link to="/dashboard/update-timesheet" className="sidebar-link">Add Timesheet</Link></span>
+        </div>
+        <div className="sidebar-item">
+          <FontAwesomeIcon icon={faChartBar} />
+          <span><Link to="/dashboard/view-timesheet" className="sidebar-link">View Timesheet</Link></span>
+        </div>
+        <div className="sidebar-item">
+          <FontAwesomeIcon icon={faTasks} />
+          <span><Link to="/dashboard/calendar-table" className="sidebar-link">Calendar</Link></span>
+        </div>
+        <div className="sidebar-item">
+          <FontAwesomeIcon icon={faStar} />
+          <span><Link to="/dashboard/teamtable" className="sidebar-link">Team Table</Link></span>
+        </div>
+      </div>
+      <button className="timesheet-button" onClick={onCalendarClick}>TIMESHEET</button>
+    </div>
+  );
+};
+
+export default Sidebars;
+
+
+
+
+
+
+
+
+
+
+
+
+import React from 'react';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faClock, faHome, faFileAlt, faChartBar, faTasks, faStar, faUsers, faDollarSign, faCogs } from '@fortawesome/free-solid-svg-icons';
+import { Link } from 'react-router-dom';
+import './Sidebar.css';
+
+const Sidebar = ({ onCalendarClick }) => {
+  return (
+    <div className="sidebar">
+      <div className="sidebar-title">
+        <FontAwesomeIcon icon={faClock} />
+        <span>TIME TITANS</span>
+      </div>
+      <div className="sidebar-search">
+        <input type="text" placeholder="Search..." />
+      </div>
+      <div className="sidebar-menu">
+        <div className="sidebar-item">
+          <FontAwesomeIcon icon={faHome} />
+          <span><Link to="/home" className="sidebar-link">Home Page</Link></span>
+        </div>
+        <div className="sidebar-item">
+          <FontAwesomeIcon icon={faFileAlt} />
+          <span>All Pages</span>
+        </div>
+        <div className="sidebar-item">
+          <FontAwesomeIcon icon={faChartBar} />
+          <span>Reports</span>
+        </div>
+        <div className="sidebar-item">
+          <FontAwesomeIcon icon={faTasks} />
+          <span><Link to="/calendar" className="sidebar-link">Task</Link></span>
+        </div>
+        <div className="sidebar-item">
+          <FontAwesomeIcon icon={faStar} />
+          <span><Link to="/teamtable" className="sidebar-link">Team</Link></span>
+        </div>
+        <div className="sidebar-item">
+          <FontAwesomeIcon icon={faUsers} />
+          <span>Employees</span>
+        </div>
+        <div className="sidebar-item">
+          <FontAwesomeIcon icon={faDollarSign} />
+          <span>Revenue</span>
+        </div>
+        <div className="sidebar-item">
+          <FontAwesomeIcon icon={faCogs} />
+          <span>Settings</span>
+        </div>
+      </div>
+      <button className="timesheet-button" onClick={onCalendarClick}>TIMESHEET</button>
+    </div>
+  );
+};
+
+export default Sidebar;
