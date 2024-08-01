@@ -1,0 +1,215 @@
+import React, { useState, useEffect } from 'react';
+import axios from 'axios';
+import { useParams } from 'react-router-dom';
+
+const EmployeeDetail = ({ onStatusChange }) => {
+  const { id } = useParams();
+  const [employeeDetail, setEmployeeDetail] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    if (id) {
+      axios.get(`http://127.0.0.1:8000/api/employee-details/${id}/`)
+        .then(response => {
+          setEmployeeDetail(response.data);
+          setLoading(false);
+        })
+        .catch(error => {
+          setError('There was an error fetching the employee details.');
+          setLoading(false);
+        });
+    }
+  }, [id]);
+
+  const handleApprovalChange = (employeeId, status) => {
+    axios.patch(`http://127.0.0.1:8000/api/employee-details/${employeeId}/`, {
+      manager_approval: status
+    })
+      .then(response => {
+        setEmployeeDetail(prevState => ({
+          ...prevState,
+          manager_approval: status
+        }));
+        onStatusChange(employeeId, status);
+      })
+      .catch(error => {
+        setError('There was an error updating the approval status.');
+      });
+  };
+
+  if (loading) {
+    return <div>Loading...</div>;
+  }
+  if (error) {
+    return <div>{error}</div>;
+  }
+
+  return (
+    <div>
+      <h2>Employee Details</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Employee Name</th>
+            <th>Emp ID</th>
+            <th>Date</th>
+            <th>Start Time</th>
+            <th>End Time</th>
+            <th>Project Name</th>
+            <th>Total Worked Hours</th>
+            <th>Lead Approval</th>
+            <th>Manager Approval</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>{employeeDetail.employee_name}</td>
+            <td>{employeeDetail.emp_id}</td>
+            <td>{employeeDetail.date}</td>
+            <td>{employeeDetail.start_time}</td>
+            <td>{employeeDetail.end_time}</td>
+            <td>{employeeDetail.project_name}</td>
+            <td>{employeeDetail.total_hours_worked}</td>
+            <td>{employeeDetail.lead_approval}</td>
+            <td>
+              {employeeDetail.manager_approval}
+              <button onClick={() => handleApprovalChange(employeeDetail.emp_id, 'approved')}>Approve</button>
+              <button onClick={() => handleApprovalChange(employeeDetail.emp_id, 'rejected')}>Reject</button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  );
+};
+
+export default EmployeeDetail;
+Backend Changes
+Update your views.py to include the update_approval method in the EmployeeDetailViewSet and ensure the urls.py is configured correctly.
+
+views.py
+python
+Copy code
+from django.http import JsonResponse
+from django.shortcuts import render
+from django.contrib.auth import login as auth_login, logout as auth_logout, authenticate
+from django.views.decorators.csrf import csrf_exempt
+from rest_framework import status, generics, viewsets
+from rest_framework.response import Response
+from rest_framework.decorators import api_view, permission_classes, action
+from rest_framework.permissions import AllowAny
+from .models import User, EmployeeDetail
+from .serializers import RegisterSerializer, EmployeeDetailSerializer, LoginSerializer
+
+class RegisterView(generics.CreateAPIView):
+    queryset = User.objects.all()
+    permission_classes = (AllowAny,)
+    serializer_class = RegisterSerializer
+
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        self.perform_create(serializer)
+        return Response({"message": "You have successfully registered"}, status=status.HTTP_201_CREATED)
+
+class LoginView(generics.CreateAPIView):
+    permission_classes = (AllowAny,)
+    serializer_class = LoginSerializer
+
+    def post(self, request):
+        serializer = LoginSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        emp_id = serializer.validated_data['emp_id']
+        password = serializer.validated_data['password']
+
+        try:
+            user = User.objects.get(emp_id=emp_id)
+            if user.check_password(password):
+                position = user.position
+                redirect_url = '/'
+                if position == 'employee':
+                    redirect_url = '/dashboard/'
+                elif position == 'lead':
+                    redirect_url = '/lead-dashboard/'
+                elif position == 'manager':
+                    redirect_url = '/home/'
+                return Response({'redirect_url': redirect_url}, status=status.HTTP_200_OK)
+            else:
+                return Response({'error': 'Invalid credentials'}, status=status.HTTP_400_BAD_REQUEST)
+        except User.DoesNotExist:
+            return Response({'error': 'User not found'}, status=status.HTTP_400_BAD_REQUEST)
+
+class EmployeeDetailView(generics.ListCreateAPIView):
+    queryset = EmployeeDetail.objects.all()
+    serializer_class = EmployeeDetailSerializer
+    permission_classes = (AllowAny,)
+
+class EmployeeDetailByEmpIDView(generics.RetrieveAPIView):
+    queryset = EmployeeDetail.objects.all()
+    serializer_class = EmployeeDetailSerializer
+    permission_classes = (AllowAny,)
+    lookup_field = 'emp_id'
+
+class EmployeeListView(generics.ListAPIView):
+    queryset = EmployeeDetail.objects.all()
+    serializer_class = EmployeeDetailSerializer
+
+def get_employee_details(request):
+    employee_details = list(EmployeeDetail.objects.values(
+        'emp_id',
+        'employee_name',
+        'start_time',
+        'end_time',
+        'project_name',
+        'lead_approval'
+    ))
+    return JsonResponse(employee_details, safe=False)
+
+class EmployeeDetailViewSet(viewsets.ModelViewSet):
+    queryset = EmployeeDetail.objects.all()
+    serializer_class = EmployeeDetailSerializer
+
+    @action(detail=True, methods=['patch'])
+    def update_approval(self, request, pk=None):
+        try:
+            employee = self.get_object()
+            serializer = EmployeeDetailSerializer(employee, data=request.data, partial=True)
+            if serializer.is_valid():
+                serializer.save()
+                return Response(serializer.data)
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+urls.py
+Ensure your urls.py includes the router for the EmployeeDetailViewSet:
+
+python
+Copy code
+from django.urls import path, include
+from rest_framework.routers import DefaultRouter
+from .views import LoginView, RegisterView, EmployeeDetailView, EmployeeDetailByEmpIDView, EmployeeListView, EmployeeDetailViewSet
+
+router = DefaultRouter()
+router.register(r'employee-details', EmployeeDetailViewSet)
+
+urlpatterns = [
+    path('login/', LoginView.as_view(), name='login'),
+    path('register/', RegisterView.as_view(), name='register'),
+    path('employee-details/', EmployeeDetailView.as_view(), name='employee-list'),
+    path('employee-details/<emp_id>/', EmployeeDetailByEmpIDView.as_view(), name='employee-detail'),
+    path('', include(router.urls)),
+]
+With these changes, clicking the Approve or Reject button will update the manager_approval field in the database and display the updated status in the same column. The update_approval method in the EmployeeDetailViewSet handles the PATCH request to update the manager_approval field.
+
+
+
+
+
+
+
+
+
+
+ChatGPT can make mistakes. Check importa
