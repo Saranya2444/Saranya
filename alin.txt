@@ -1,0 +1,396 @@
+import React, { useEffect, useState } from 'react';
+import axios from 'axios';
+import { Bar } from 'react-chartjs-2';
+import 'chart.js/auto';
+import './HomePage.css'; // Ensure you have a CSS file for styling
+
+const HomePage = ({ employeeName, empId, email }) => {
+  const [percentage, setPercentage] = useState(80); // Default percentage
+
+  // Dummy data for the bar chart
+  const data = {
+    labels: ['January', 'February', 'March', 'April', 'May', 'June'],
+    datasets: [
+      {
+        label: 'Attendance Percentage',
+        data: [65, 59, 80, 81, 56, 55],
+        backgroundColor: 'rgba(75, 192, 192, 0.6)',
+        borderColor: 'rgba(75, 192, 192, 1)',
+        borderWidth: 1,
+      },
+    ],
+  };
+
+  const options = {
+    responsive: true,
+    scales: {
+      y: {
+        beginAtZero: true,
+      },
+    },
+  };
+
+  return (
+    <div className="home-page">
+      <h1>Welcome, {employeeName} <span role="img" aria-label="smile">😊</span></h1>
+      <p>ID: {empId}</p>
+      <p>Email: {email}</p>
+      <div className="content-container">
+        <div className="chart-container">
+          <Bar data={data} options={options} />
+        </div>
+        <div className="circular-progress-container">
+          <div className="circular-progress">
+            <div className="circle">
+              <div className="mask full" style={{ transform: `rotate(${1.8 * percentage}deg)` }}>
+                <div className="fill" style={{ transform: `rotate(${1.8 * percentage}deg)` }}></div>
+              </div>
+              <div className="mask half">
+                <div className="fill" style={{ transform: `rotate(${1.8 * percentage}deg)` }}></div>
+              </div>
+              <div className="inside-circle">{percentage}%</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default HomePage;
+
+
+
+
+
+
+
+.home-page {
+    text-align: center;
+  }
+  
+  .content-container {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 20px;
+  }
+  
+  .chart-container {
+    flex: 1;
+    padding: 20px;
+    color:blueviolet
+  }
+  
+  .circular-progress-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 200px;
+    margin-top: 20px;
+  }
+  
+  .circular-progress {
+    position: relative;
+    width: 120px;
+    height: 120px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+  }
+  
+  .circle {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    background-color: #e6e6e6;
+  }
+  
+  .circle .mask, .circle .fill {
+    width: 100%;
+    height: 100%;
+    position: absolute;
+    border-radius: 50%;
+  }
+  
+  .circle .mask {
+    clip: rect(0px, 60px, 120px, 0px);
+  }
+  
+  .circle .fill {
+    clip: rect(0px, 60px, 120px, 0px);
+    background: rgb(2,0,36);
+    background: linear-gradient(90deg, rgba(2,0,36,1) 0%, rgba(45,188,218,1) 0%, rgba(97,49,139,1) 0%, rgba(35,153,213,1) 0%, rgba(0,212,255,1) 0%, rgba(90,62,148,1) 0%, rgba(252,4,234,1) 0%, rgba(172,7,159,1) 0%, rgba(18,90,151,1) 100%, rgba(9,62,121,1) 100%);
+  }
+  
+  .circle .mask.full, .circle .mask.half {
+    animation: rotate 2s linear infinite;
+  }
+  
+  .circle .mask.full {
+    clip: rect(0px, 120px, 120px, 60px);
+    background-color: transparent;
+  }
+  
+  .circle .mask.half {
+    clip: rect(0px, 60px, 120px, 0px);
+  }
+  
+  .circle .inside-circle {
+    width: 80%;
+    height: 80%;
+    border-radius: 50%;
+    background: white;
+    display: flex;
+    transform: translate(12px,12px);
+    justify-content: center;
+    align-items: center;
+    font-size: 20px;
+    position:absolute;
+  }
+  
+  @keyframes rotate {
+    0% {
+      transform: rotate(0deg);
+    }
+    100% {
+      transform: rotate(360deg);
+    }
+  }
+  .labels{
+    color:white;
+  }
+  .scales{
+    color:white;
+  }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+import React, { useState, useEffect } from 'react';
+import { Routes, Route, useNavigate, useLocation } from 'react-router-dom';
+import axios from 'axios';
+import Navbar from './Navbar';
+import Sidebar from './Sidebar';
+import Sidebars from './Sidebars';
+import CalendarTable from './CalendarTable';
+import HomePage from './HomePage';
+import TeamTable from './TeamTable';
+import EmployeeList from './EmployeeList';
+import EmployeeDetail from './EmployeeDetail';
+import LoginForm from './LoginForm';
+import './App.css';
+import EmployeeDashboard from './EmployeeDashboard';
+import ManagerDashboard from './ManagerDashboard';
+import LeadDashboard from './LeadDashboard';
+import Dashboard from './Dashboard';
+
+const App = () => {
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [empId, setEmpId] = useState(null);
+  const [employeeName, setEmployeeName] = useState('');
+  const [email, setEmail] = useState('');
+  const [userRole, setUserRole] = useState('employee'); // Add state for user role
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  const handleLogin = (empId) => {
+    setEmpId(empId);
+    setIsLoggedIn(true);
+    // Fetch user role and other details
+    axios.get(`http://127.0.0.1:8000/api/employee-details1/${empId}/`)
+      .then(response => {
+        setEmployeeName(response.data.employee_name);
+        setEmail(response.data.email);
+        setUserRole(response.data.position); // Set user role based on response
+      })
+      .catch(error => {
+        console.error('There was an error fetching the employee details!', error);
+      });
+  };
+
+  useEffect(() => {
+    if (empId) {
+      axios.get(`http://127.0.0.1:8000/api/employee-details1/${empId}/`)
+        .then(response => {
+          setEmployeeName(response.data.employee_name);
+          setEmail(response.data.email);
+          setUserRole(response.data.position); // Set user role based on response
+        })
+        .catch(error => {
+          console.error('There was an error fetching the employee details!', error);
+        });
+    }
+  }, [empId]);
+
+  const handleCalendarClick = () => {
+    navigate('/calendar');
+  };
+
+  const handleSelectEmployee = (employeeId) => {
+    navigate(`/employees/${employeeId}`);
+  };
+
+  if (!isLoggedIn) {
+    return <LoginForm onLogin={handleLogin} />;
+  }
+
+  const showSidebar = !location.pathname.startsWith('/dashboard');
+
+  return (
+    <div className="app">
+      <Navbar />
+      <div className="main-content-container">
+        {showSidebar ? (
+          <Sidebar onCalendarClick={handleCalendarClick} />
+        ) : (
+          <Sidebars onCalendarClick={handleCalendarClick} />
+        )}
+        <div className="main-content">
+          <Routes>
+            <Route path="/login" element={<LoginForm />} />
+            <Route path="/dashboard/*" element={<Dashboard />} />
+            <Route path="/employee-dashboard" element={<EmployeeDashboard />} />
+            <Route path="/manager-dashboard" element={<ManagerDashboard />} />
+            <Route path="/lead-dashboard" element={<LeadDashboard />} />
+            <Route path="/home" element={<HomePage employeeName={employeeName} empId={empId} email={email} />} />
+            <Route path="/calendar" element={<CalendarTable empId={empId} employeeName={employeeName} />} />
+            <Route path="/employees" element={<EmployeeList onSelectEmployee={handleSelectEmployee} />} />
+            <Route path="/employees/:id" element={<EmployeeDetail userRole={userRole} />} />
+            <Route path="/teamtable" element={<TeamTable />} />
+            <Route path="/profile" element={<HomePage />} />
+          </Routes>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default App;
+
+
+
+
+
+
+
+import React, { useState, useEffect } from 'react';
+import './CalendarTable.css';
+import axios from 'axios';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faSmile } from '@fortawesome/free-solid-svg-icons';
+
+const CalendarTable = ({ empid }) => {
+  const [hours, setHours] = useState(Array(30).fill([]));
+  const [employeeName, setEmployeeName] = useState('');
+  const rows = Array.from({ length: 6 });
+  const columns = Array.from({ length: 5 });
+
+  useEffect(() => {
+    if (empid) {
+      axios.get(`http://127.0.0.1:8000/api/employee-details1/${empid}/`)
+        .then(response => {
+          setEmployeeName(response.data.employee_name);
+        })
+        .catch(error => {
+          console.error('There was an error fetching the employee details!', error);
+        });
+    }
+  }, [empid]);
+
+  const getRandomColor = () => {
+    const letters = '0123456789ABCDEF';
+    let color = '#';
+    for (let i = 0; i < 6; i++) {
+      color += letters[Math.floor(Math.random() * 16)];
+    }
+    return color;
+  };
+
+  const addHours = (index, newHours) => {
+    const updatedHours = [...hours];
+    updatedHours[index] = [
+      ...updatedHours[index],
+      { hours: newHours, color: getRandomColor() }
+    ];
+    setHours(updatedHours);
+  };
+
+  const isWeekend = (index) => {
+    const dayOfWeek = (index + 1) % 7;
+    return dayOfWeek === 0 || dayOfWeek === 6;
+  };
+
+  return (
+    <div className="calendar-table">
+      <div className="header">
+        <span>Name: {employeeName}</span>
+        <span>Employee ID: {empid}</span>
+        <span>Month: July</span>
+        <span>Year: 2024</span>
+      </div>
+      <table>
+        <tbody>
+          {rows.map((_, rowIndex) => (
+            <tr key={rowIndex}>
+              {columns.map((_, colIndex) => {
+                const index = rowIndex * 5 + colIndex;
+                return (
+                  <td key={colIndex}>
+                    <div className="cell-content">
+                      <span className="date">{index + 1}</span>
+                      <button
+                        className="add-hours"
+                        onClick={() => {
+                          const newHours = prompt('Enter worked hours:');
+                          if (newHours && !isNaN(newHours)) {
+                            addHours(index, parseInt(newHours, 10));
+                          }
+                        }}
+                      >
+                        +
+                      </button>
+                      <div className="hours-circles">
+                        {hours[index].map((entry, i) => (
+                          <div
+                            key={i}
+                            className="hours-circle"
+                            style={{ backgroundColor: entry.color }}
+                          >
+                            {entry.hours}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </td>
+                );
+              })}
+              <td>
+                {isWeekend(rowIndex * 5 + columns.length) ? (
+                  <span>Weekend</span>
+                ) : (
+                  <FontAwesomeIcon icon={faSmile} />
+                )}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+};
+
+export default CalendarTable;
