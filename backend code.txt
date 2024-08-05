@@ -1,0 +1,474 @@
+
+#models.py
+from django.db import models
+from django.contrib.auth.models import AbstractBaseUser, BaseUserManager
+from django.utils import timezone
+
+class UserManager(BaseUserManager):
+    def create_user(self, username, email, emp_id, position, joining_date, password=None):
+        if not email:
+            raise ValueError('Users must have an email address')
+        user = self.model(
+            username=username,
+            email=self.normalize_email(email),
+            emp_id=emp_id,
+            position=position,
+            joining_date=joining_date
+        )
+        user.set_password(password)
+        user.save(using=self._db)
+        return user
+
+    def create_superuser(self, username, email, emp_id, position, joining_date, password=None):
+        user = self.create_user(
+            username=username,
+            email=email,
+            emp_id=emp_id,
+            position=position,
+            joining_date=joining_date,
+            password=password
+        )
+        user.is_admin = True
+        user.save(using=self._db)
+        return user
+
+class User(AbstractBaseUser):
+    POSITION_CHOICES = [
+        ('employee', 'Employee'),
+        ('lead', 'Lead'),
+        ('manager', 'Manager'),
+    ]
+
+    username = models.CharField(max_length=30, unique=True)
+    email = models.EmailField(max_length=255, unique=True)
+    emp_id = models.CharField(max_length=10, unique=True, primary_key=True)
+    is_active = models.BooleanField(default=True)
+    is_admin = models.BooleanField(default=False)
+    Time_stamp = models.DateTimeField(default=timezone.now)
+    position = models.CharField(max_length=10, choices=POSITION_CHOICES, default='employee')
+    joining_date = models.DateField()
+
+    objects = UserManager()
+
+    USERNAME_FIELD = 'username'
+    REQUIRED_FIELDS = ['email', 'emp_id', 'position', 'joining_date']
+
+    def __str__(self):
+        return self.username
+
+    def has_perm(self, perm, obj=None):
+        return self.is_admin
+
+    def has_module_perms(self, app_label):
+        return self.is_admin
+
+class EmployeeDetail(models.Model):
+    emp_id = models.CharField(max_length=10, primary_key=True)
+    employee_name = models.CharField(max_length=100)
+    start_time = models.TimeField()
+    end_time = models.TimeField()
+    project_name = models.CharField(max_length=100)
+    comments = models.TextField()
+    date = models.DateField()
+    total_hours_worked = models.DecimalField(max_digits=5, decimal_places=2)
+    lead_approval = models.CharField(max_length=20, choices=[('approved', 'Approved'), ('rejected', 'Rejected'),
+                                                             ('pending', 'Pending')], default='pending')
+    manager_approval = models.CharField(max_length=20, choices=[('approved', 'Approved'), ('rejected', 'Rejected'),
+                                                                ('pending', 'Pending')], default='pending')
+
+    def __str__(self):
+        return self.employee_name
+
+
+
+
+
+
+# myapp/serializers.py
+
+from rest_framework import serializers
+from .models import User, EmployeeDetail
+from django.contrib.auth.password_validation import validate_password
+
+class RegisterSerializer(serializers.ModelSerializer):
+    password = serializers.CharField(write_only=True, required=True, validators=[validate_password])
+    joining_date = serializers.DateField()
+
+    class Meta:
+        model = User
+        fields = ('username', 'email', 'emp_id', 'position', 'joining_date', 'password')
+
+    def create(self, validated_data):
+        user = User.objects.create_user(
+            username=validated_data['username'],
+            email=validated_data['email'],
+            emp_id=validated_data['emp_id'],
+            position=validated_data['position'],
+            joining_date=validated_data['joining_date'],
+            password=validated_data['password']
+        )
+        return user
+
+class UserSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = ['username', 'email', 'emp_id', 'position', 'joining_date']
+        extra_kwargs = {
+            'password': {'write_only': True},
+            'Time_stamp': {'read_only': True},
+            'joining_date': {'read_only': True}
+        }
+
+    def create(self, validated_data):
+        user = User.objects.create_user(
+            username=validated_data['username'],
+            email=validated_data['email'],
+            emp_id=validated_data['emp_id'],
+            position=validated_data['position'],
+            password=validated_data['password']
+        )
+        return user
+
+# myapp/serializers.py
+class EmployeeDetailSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = EmployeeDetail
+        fields = '__all__'
+
+
+    def update(self, instance, validated_data):
+        instance.lead_approval = validated_data.get('lead_approval', instance.lead_approval)
+        instance.manager_approval=validated_data.get('manager_approval',instance.manager_approval)
+        instance.save()
+        return instance
+
+
+class LoginSerializer(serializers.Serializer):
+    emp_id = serializers.CharField()
+    password = serializers.CharField(write_only=True)
+
+
+# myapp/urls.py
+from django.urls import path
+from .views import LoginView, RegisterView, EmployeeDetailView, EmployeeDetailByEmpIDView, EmployeeListView,EmployeeDetailByEmpIDView1,UpdateApprovalView
+
+urlpatterns = [
+    path('login/', LoginView.as_view(), name='login'),
+    path('register/', RegisterView.as_view(), name='register'),
+    path('employee-details/', EmployeeDetailView.as_view(), name='employee-list'),
+    path('employee-details/<emp_id>/', EmployeeDetailByEmpIDView.as_view(), name='employee-detail'),
+path('employee-details1/<emp_id>/', EmployeeDetailByEmpIDView1.as_view(), name='employee-detail'),
+ path('employee-details/<str:pk>/update_approval/', UpdateApprovalView.as_view(), name='update-approval'),  # Updated this line
+
+]
+
+from django.http import JsonResponse
+from django.shortcuts import render
+from django.contrib.auth import login as auth_login, logout as auth_logout, authenticate
+from django.views.decorators.csrf import csrf_exempt
+from rest_framework import status, generics, viewsets
+from rest_framework.response import Response
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import AllowAny
+import logging
+from django.utils import timezone
+from datetime import timedelta
+from rest_framework.views import APIView
+from .models import User, EmployeeDetail
+from .serializers import RegisterSerializer, EmployeeDetailSerializer, LoginSerializer, UserSerializer
+
+logger = logging.getLogger(__name__)
+
+class RegisterView(generics.CreateAPIView):
+    queryset = User.objects.all()
+    permission_classes = (AllowAny,)
+    serializer_class = RegisterSerializer
+
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        self.perform_create(serializer)
+        return Response({"message": "You have successfully registered"}, status=status.HTTP_201_CREATED)
+
+class LoginView(generics.CreateAPIView):
+    permission_classes = (AllowAny,)
+    serializer_class = LoginSerializer
+
+    def post(self, request):
+        serializer = LoginSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        emp_id = serializer.validated_data['emp_id']
+        password = serializer.validated_data['password']
+        print(emp_id)
+        print(password)
+
+        try:
+            user = User.objects.get(emp_id=emp_id)
+            if user.check_password(password):
+                position = user.position
+                redirect_url = '/'
+                if position == 'employee':
+                    redirect_url = '/dashboard/profile/'
+                elif position == 'lead':
+                    redirect_url = '/lead-dashboard/'
+                elif position == 'manager':
+                    redirect_url = '/home/'
+                return Response({'redirect_url': redirect_url}, status=status.HTTP_200_OK)
+            else:
+                return Response({'error': 'Invalid credentials'}, status=status.HTTP_400_BAD_REQUEST)
+        except User.DoesNotExist:
+            return Response({'error': 'User not found'}, status=status.HTTP_400_BAD_REQUEST)
+
+class EmployeeDetailView(generics.ListCreateAPIView):
+    serializer_class = EmployeeDetailSerializer
+    permission_classes = (AllowAny,)
+
+    def get_queryset(self):
+        emp_id = self.request.query_params.get('emp_id', None)
+        print(emp_id)
+        if emp_id:
+            print(emp_id)
+            return EmployeeDetail.objects.filter(emp_id=emp_id)
+        return EmployeeDetail.objects.all()
+
+class EmployeeDetailByEmpIDView(generics.RetrieveAPIView):
+    queryset = EmployeeDetail.objects.all()
+    serializer_class = EmployeeDetailSerializer
+    permission_classes = (AllowAny,)
+    print(serializer_class)
+    lookup_field = 'emp_id'
+
+    def patch(self, request, *args, **kwargs):
+        emp_id = self.kwargs.get('emp_id')
+        print(request.data, emp_id)
+        employee_detail = self.get_object()
+        serializer = self.get_serializer(employee_detail, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        self.perform_update(serializer)
+
+        print(serializer.data)
+        return Response(serializer.data)
+
+class EmployeeDetailByEmpIDView1(generics.RetrieveAPIView):
+    queryset = User.objects.all()
+    serializer_class = UserSerializer
+    permission_classes = (AllowAny,)
+    print(serializer_class)
+    lookup_field = 'emp_id'
+
+    def patch(self, request, *args, **kwargs):
+        emp_id = self.kwargs.get('emp_id')
+        print(request.data, emp_id)
+        employee_detail = self.get_object()
+        serializer = self.get_serializer(employee_detail, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        self.perform_update(serializer)
+
+        print(serializer.data)
+        return Response(serializer.data)
+
+class EmployeeListView(generics.ListAPIView):
+    queryset = EmployeeDetail.objects.all()
+    serializer_class = EmployeeDetailSerializer
+
+    def get_employee_details(request):
+        employee_details = list(EmployeeDetail.objects.values(
+            'emp_id',
+            'employee_name',
+            'start_time',
+            'end_time',
+            'project_name',
+            'lead_approval'
+        ))
+        print(employee_details)
+        return JsonResponse(employee_details, safe=False)
+
+class EmployeeDetailViewSet(viewsets.ModelViewSet):
+    queryset = EmployeeDetail.objects.all()
+    serializer_class = EmployeeDetailSerializer
+    print(serializer_class)
+
+    def update_approval(self, request, pk=None):
+        try:
+            print('here')
+            employee = self.get_object()
+            print(employee)
+            serializer = EmployeeDetailSerializer(employee, data=request.data, partial=True)
+            if serializer.is_valid():
+                serializer.save()
+                return Response(serializer.data)
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+class UpdateApprovalView(APIView):
+    permission_classes = (AllowAny,)
+
+    def post(self, request, pk):
+        try:
+            employee_detail = EmployeeDetail.objects.get(pk=pk)
+            print(employee_detail)
+            action = request.data.get("action")
+            print(request.data)
+            print(action)
+            if action not in ['approve', 'reject']:
+                return Response({"error": "Invalid action"}, status=status.HTTP_400_BAD_REQUEST)
+            if request.data['userRole'] == 'lead':
+                employee_detail.lead_approval = 'approved' if action == 'approve' else 'rejected'
+                employee_detail.save()
+                return Response({"message": f"Lead approval updated to {employee_detail.lead_approval}"},
+                                status=status.HTTP_200_OK)
+            else:
+                employee_detail.manager_approval = 'approved' if action == 'approve' else 'rejected'
+                employee_detail.save()
+                return Response({"message": f"Lead approval updated to {employee_detail.manager_approval}"},
+                            status=status.HTTP_200_OK)
+        except EmployeeDetail.DoesNotExist:
+            return Response({"error": "Employee detail not found"}, status=status.HTTP_404_NOT_FOUND)
+
+
+
+
+# myapp/admin.py
+
+from django.contrib import admin
+from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
+from django.contrib.auth.models import Group
+from .models import User, EmployeeDetail
+
+class UserAdmin(BaseUserAdmin):
+    list_display = ('username', 'email', 'emp_id', 'is_admin', 'position', 'joining_date', 'Time_stamp')
+    list_filter = ('is_admin','position')
+    fieldsets = (
+        (None, {'fields': ('username', 'email', 'emp_id', 'password')}),
+        ('Personal info', {'fields': ('position', 'joining_date','Time_stamp',)}),
+        ('Permissions', {'fields': ('is_admin',)}),
+    )
+    add_fieldsets = (
+        (None, {
+            'classes': ('wide',),
+            'fields': ('username', 'email', 'emp_id','position', 'joining_date', 'password1', 'password2'),
+        }),
+    )
+    search_fields = ('username', 'email', 'emp_id','position')
+    ordering = ('username',)
+    filter_horizontal = ()
+
+class EmployeeDetailAdmin(admin.ModelAdmin):
+    list_display = ('employee_name', 'emp_id', 'project_name', 'date', 'total_hours_worked', 'lead_approval', 'manager_approval')
+    list_filter = ('project_name', 'date', 'lead_approval', 'manager_approval')
+    search_fields = ('employee_name', 'emp_id', 'project_name')
+    ordering = ('date',)
+
+admin.site.register(User, UserAdmin)
+admin.site.register(EmployeeDetail, EmployeeDetailAdmin)
+
+# Unregister the Group model from admin as it's not used
+admin.site.unregister(Group)
+
+====================================
+
+#UpdateTimesheet.js
+import React, { useState } from 'react';
+import axios from 'axios';
+import './UpdateTimesheet.css';
+
+const UpdateTimesheet = () => {
+  const [formData, setFormData] = useState({
+    emp_id: '',
+    employee_name: '',
+    start_time: '',
+    end_time: '',
+    project_name: '',
+    total_hours_worked: '',
+    comments: '',
+    date: '',
+  });
+
+  const [error, setError] = useState(null);
+
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setFormData({ ...formData, [name]: value });
+  };
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    const data = {
+      ...formData,
+      total_hours_worked: parseFloat(formData.total_hours_worked), // Ensure total hours is a float
+    };
+
+    axios.post('http://127.0.0.1:8000/api/employee-details/', data)
+      .then(response => {
+        alert('Timesheet added successfully');
+        setFormData({
+          emp_id: '',
+          employee_name: '',
+          start_time: '',
+          end_time: '',
+          project_name: '',
+          total_hours_worked: '',
+          comments: '',
+          date: '',
+        });
+        setError(null);
+      })
+      .catch(error => {
+        console.error('Error adding timesheet:', error);
+        if (error.response) {
+          setError(`Failed to add timesheet: ${JSON.stringify(error.response.data)}`);
+        } else if (error.request) {
+          setError('Failed to add timesheet: No response from server');
+        } else {
+          setError(`Failed to add timesheet: ${error.message}`);
+        }
+      });
+  };
+
+  return (
+    <div className="update-timesheet-container">
+      <h2>Update Timesheet</h2>
+      {error && <p className="error">{error}</p>}
+      <form onSubmit={handleSubmit}>
+        <label>
+          Employee ID:
+          <input type="text" name="emp_id" value={formData.emp_id} onChange={handleChange} required />
+        </label>
+        <label>
+          Employee Name:
+          <input type="text" name="employee_name" value={formData.employee_name} onChange={handleChange} required />
+        </label>
+        <label>
+          Start Time:
+          <input type="time" name="start_time" value={formData.start_time} onChange={handleChange} required />
+        </label>
+        <label>
+          End Time:
+          <input type="time" name="end_time" value={formData.end_time} onChange={handleChange} required />
+        </label>
+        <label>
+          Project Name:
+          <input type="text" name="project_name" value={formData.project_name} onChange={handleChange} required />
+        </label>
+        <label>
+          Total Hours Worked:
+          <input type="number" name="total_hours_worked" step="0.01" value={formData.total_hours_worked} onChange={handleChange} required />
+        </label>
+        <label>
+          Comments:
+          <input type="text" name="comments" value={formData.comments} onChange={handleChange} required />
+        </label>
+        <label>
+          Date:
+          <input type="date" name="date" value={formData.date} onChange={handleChange} required />
+        </label>
+        <button type="submit">Add</button>
+      </form>
+    </div>
+  );
+};
+
+export default UpdateTimesheet;
+
