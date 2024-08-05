@@ -1,0 +1,370 @@
+homepage.py
+
+import React, { useEffect, useState } from 'react';
+import axios from 'axios';
+import { Bar } from 'react-chartjs-2';
+import 'chart.js/auto';
+import './HomePage.css'; // Ensure you have a CSS file for styling
+
+const HomePage = ({ employeeName, empId, email }) => {
+  const [percentage, setPercentage] = useState(80); // Default percentage
+  const [leaveDays, setLeaveDays] = useState(0); // State for leave days
+
+  useEffect(() => {
+    axios.get(`http://127.0.0.1:8000/api/get-employee-details/${empId}/`)
+      .then(response => {
+        const joiningDate = new Date(response.data.joining_date);
+        const workDates = response.data.work_dates.map(date => new Date(date));
+        
+        const calculateLeaveDays = (joiningDate, workDates) => {
+          const today = new Date();
+          let leaveDays = 0;
+
+          for (let d = new Date(joiningDate); d <= today; d.setDate(d.getDate() + 1)) {
+            // Exclude Sundays
+            if (d.getDay() !== 0) {
+              const isWorkDay = workDates.some(workDate => 
+                workDate.getFullYear() === d.getFullYear() &&
+                workDate.getMonth() === d.getMonth() &&
+                workDate.getDate() === d.getDate()
+              );
+              if (!isWorkDay) {
+                leaveDays++;
+              }
+            }
+          }
+          return leaveDays;
+        };
+
+        setLeaveDays(calculateLeaveDays(joiningDate, workDates));
+      })
+      .catch(error => {
+        console.error('There was an error fetching the leave days!', error);
+      });
+  }, [empId]);
+
+  // Dummy data for the bar chart
+  const data = {
+    labels: ['January', 'February', 'March', 'April', 'May', 'June','August'],
+    datasets: [
+      {
+        label: 'Attendance Percentage',
+        data: [65, 59, 80, 81, 56, 55,5],
+        backgroundColor: 'rgba(75, 192, 192, 0.6)',
+        borderColor: 'rgba(75, 192, 192, 1)',
+        borderWidth: 1,
+      },
+    ],
+  };
+
+  const options = {
+    responsive: true,
+    scales: {
+      y: {
+        beginAtZero: true,
+      },
+    },
+  };
+
+  return (
+    <div className="home-page">
+      <h1>Welcome, {employeeName} <span role="img" aria-label="smile">😊</span></h1>
+       
+      <div className="content-container">
+        <div className="chart-container">
+          <Bar data={data} options={options} />
+        </div>
+        <div className="circular-progress-container">
+          <div className="circular-progress">
+            <div className="circle">
+              <div className="mask full" style={{ transform: `rotate(${1.8 * percentage}deg)` }}>
+                <div className="fill" style={{ transform: `rotate(${1.8 * percentage}deg)` }}></div>
+              </div>
+              <div className="mask half">
+                <div className="fill" style={{ transform: `rotate(${1.8 * percentage}deg)` }}></div>
+              </div>
+              <div className="inside-circle">{percentage}%</div>
+            </div>
+          </div>
+        </div>
+        <div className="leave-days-container">
+          <h2>Total Leave Days: {leaveDays}</h2>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default HomePage;
+
+------------------------------
+models.py
+
+
+from django.db import models
+from django.contrib.auth.models import AbstractBaseUser, BaseUserManager
+from django.utils import timezone
+
+class UserManager(BaseUserManager):
+    def create_user(self, username, email, emp_id, position, joining_date, password=None):
+        if not email:
+            raise ValueError('Users must have an email address')
+        user = self.model(
+            username=username,
+            email=self.normalize_email(email),
+            emp_id=emp_id,
+            position=position,
+            joining_date=joining_date
+        )
+        user.set_password(password)
+        user.save(using=self._db)
+        return user
+
+    def create_superuser(self, username, email, emp_id, position, joining_date, password=None):
+        user = self.create_user(
+            username=username,
+            email=email,
+            emp_id=emp_id,
+            position=position,
+            joining_date=joining_date,
+            password=password
+        )
+        user.is_admin = True
+        user.save(using=self._db)
+        return user
+
+class User(AbstractBaseUser):
+    POSITION_CHOICES = [
+        ('employee', 'Employee'),
+        ('lead', 'Lead'),
+        ('manager', 'Manager'),
+    ]
+
+    username = models.CharField(max_length=30, unique=True)
+    email = models.EmailField(max_length=255, unique=True)
+    emp_id = models.CharField(max_length=10, unique=True, primary_key=True)
+    is_active = models.BooleanField(default=True)
+    is_admin = models.BooleanField(default=False)
+    Time_stamp = models.DateTimeField(default=timezone.now)
+    position = models.CharField(max_length=10, choices=POSITION_CHOICES, default='employee')
+    joining_date = models.DateField()
+
+    objects = UserManager()
+
+    USERNAME_FIELD = 'username'
+    REQUIRED_FIELDS = ['email', 'emp_id', 'position', 'joining_date']
+
+    def __str__(self):
+        return self.emp_id
+
+    def has_perm(self, perm, obj=None):
+        return self.is_admin
+
+    def has_module_perms(self, app_label):
+        return self.is_admin
+
+class Project(models.Model):
+    STATUS_CHOICES = [
+        ('pending', 'Pending'),
+        ('approved', 'Approved'),
+        ('rejected', 'Rejected'),
+    ]
+
+    emp_id = models.ForeignKey(User, on_delete=models.CASCADE)
+    project_name = models.CharField(max_length=100)
+    project_module = models.CharField(max_length=100)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
+    timestamp = models.DateTimeField(default=timezone.now)
+
+    def __str__(self):
+        return f"{self.project_name} ({self.emp_id.emp_id})"
+
+class EmployeeDetail(models.Model):
+    emp_id = models.ForeignKey(User, on_delete=models.CASCADE)
+    employee_name = models.CharField(max_length=100)
+    start_time = models.TimeField()
+    end_time = models.TimeField()
+    project_name = models.CharField(max_length=100, editable=False)
+    comments = models.TextField()
+    date = models.DateField()
+    total_hours_worked = models.DecimalField(max_digits=5, decimal_places=2)
+    lead_approval = models.CharField(max_length=20, choices=[('approved', 'Approved'), ('rejected', 'Rejected'),
+                                                             ('pending', 'Pending')], default='pending')
+    manager_approval = models.CharField(max_length=20, choices=[('approved', 'Approved'), ('rejected', 'Rejected'),
+                                                                ('pending', 'Pending')], default='pending')
+
+    def __str__(self):
+        return self.employee_name
+
+    def save(self, *args, **kwargs):
+        # Fetch the project name from Project model
+        project = Project.objects.filter(emp_id=self.emp_id).first()
+        if project:
+            self.project_name = project.project_name
+        super().save(*args, **kwargs)
+---------------------
+
+views.py
+
+from django.http import JsonResponse
+from django.shortcuts import render
+from django.contrib.auth import login as auth_login, logout as auth_logout, authenticate
+from rest_framework import status, generics, viewsets
+from rest_framework.response import Response
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import AllowAny
+import logging
+from django.utils import timezone
+from datetime import timedelta
+from rest_framework.views import APIView
+from .models import User, EmployeeDetail, Project
+from .serializers import RegisterSerializer, EmployeeDetailSerializer, LoginSerializer, UserSerializer, ProjectSerializer
+
+logger = logging.getLogger(__name__)
+
+class RegisterView(generics.CreateAPIView):
+    queryset = User.objects.all()
+    permission_classes = (AllowAny,)
+    serializer_class = RegisterSerializer
+
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        self.perform_create(serializer)
+        return Response({"message": "You have successfully registered"}, status=status.HTTP_201_CREATED)
+
+class LoginView(generics.CreateAPIView):
+    permission_classes = (AllowAny,)
+    serializer_class = LoginSerializer
+
+    def post(self, request):
+        serializer = LoginSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        emp_id = serializer.validated_data['emp_id']
+        password = serializer.validated_data['password']
+
+        try:
+            user = User.objects.get(emp_id=emp_id)
+            if user.check_password(password):
+                position = user.position
+                redirect_url = '/'
+                if position == 'employee':
+                    redirect_url = '/dashboard/profile/'
+                elif position == 'lead':
+                    redirect_url = '/lead-dashboard/'
+                elif position == 'manager':
+                    redirect_url = '/home/'
+                return Response({'redirect_url': redirect_url}, status=status.HTTP_200_OK)
+            else:
+                return Response({'error': 'Invalid credentials'}, status=status.HTTP_400_BAD_REQUEST)
+        except User.DoesNotExist:
+            return Response({'error': 'User not found'}, status=status.HTTP_400_BAD_REQUEST)
+
+class EmployeeDetailView(generics.ListCreateAPIView):
+    serializer_class = EmployeeDetailSerializer
+    permission_classes = (AllowAny,)
+
+    def get_queryset(self):
+        emp_id = self.request.query_params.get('emp_id', None)
+        if emp_id:
+            return EmployeeDetail.objects.filter(emp_id=emp_id)
+        return EmployeeDetail.objects.all()
+
+class EmployeeDetailByEmpIDView(generics.RetrieveAPIView):
+    queryset = EmployeeDetail.objects.all()
+    serializer_class = EmployeeDetailSerializer
+    permission_classes = (AllowAny,)
+    lookup_field = 'emp_id'
+
+    def patch(self, request, *args, **kwargs):
+        emp_id = self.kwargs.get('emp_id')
+        employee_detail = self.get_object()
+        serializer = self.get_serializer(employee_detail, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        self.perform_update(serializer)
+        return Response(serializer.data)
+class EmployeeDetailByEmpIDView1(generics.RetrieveAPIView):
+    queryset = User.objects.all()
+    serializer_class = UserSerializer
+    permission_classes = (AllowAny,)
+    lookup_field = 'emp_id'
+
+    def patch(self, request, *args, **kwargs):
+        emp_id = self.kwargs.get('emp_id')
+        user_detail = self.get_object()
+        serializer = self.get_serializer(user_detail, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        self.perform_update(serializer)
+        return Response(serializer.data)
+
+class EmployeeListView(generics.ListAPIView):
+    queryset = EmployeeDetail.objects.all()
+    serializer_class = EmployeeDetailSerializer
+
+    def get_employee_details(request):
+        employee_details = list(EmployeeDetail.objects.values(
+            'emp_id',
+            'employee_name',
+            'start_time',
+            'end_time',
+            'project_name',
+            'lead_approval'
+        ))
+        return JsonResponse(employee_details, safe=False)
+
+class EmployeeDetailViewSet(viewsets.ModelViewSet):
+    queryset = EmployeeDetail.objects.all()
+    serializer_class = EmployeeDetailSerializer
+
+    def update_approval(self, request, pk=None):
+        try:
+            employee = self.get_object()
+            serializer = EmployeeDetailSerializer(employee, data=request.data, partial=True)
+            if serializer.is_valid():
+                serializer.save()
+                return Response(serializer.data)
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+class UpdateApprovalView(APIView):
+    permission_classes = (AllowAny,)
+
+    def post(self, request, pk):
+        try:
+            employee_detail = EmployeeDetail.objects.get(pk=pk)
+            action = request.data.get("action")
+            if action not in ['approve', 'reject']:
+                return Response({"error": "Invalid action"}, status=status.HTTP_400_BAD_REQUEST)
+            if request.data.get('userRole') == 'lead':
+                employee_detail.lead_approval = 'approved' if action == 'approve' else 'rejected'
+                employee_detail.save()
+                return Response({"message": f"Lead approval updated to {employee_detail.lead_approval}"}, status=status.HTTP_200_OK)
+            else:
+                employee_detail.manager_approval = 'approved' if action == 'approve' else 'rejected'
+                employee_detail.save()
+                return Response({"message": f"Manager approval updated to {employee_detail.manager_approval}"}, status=status.HTTP_200_OK)
+        except EmployeeDetail.DoesNotExist:
+            return Response({"error": "Employee detail not found"}, status=status.HTTP_404_NOT_FOUND)
+
+class ProjectViewSet(viewsets.ModelViewSet):
+    queryset = Project.objects.all()
+    serializer_class = ProjectSerializer
+
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        self.perform_create(serializer)
+        headers = self.get_success_headers(serializer.data)
+        return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
+
+    def update(self, request, *args, **kwargs):
+        return super().update(request, *args, **kwargs)
+
+    def partial_update(self, request, *args, **kwargs):
+        return super().partial_update(request, *args, **kwargs)
+
+    def destroy(self, request, *args, **kwargs):
+        return super().destroy(request, *args, **kwargs)
+------------------------------------
