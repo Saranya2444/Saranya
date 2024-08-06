@@ -1,0 +1,959 @@
+import React, { useState, useEffect } from 'react';
+import { Routes, Route, useNavigate, useLocation } from 'react-router-dom';
+import axios from 'axios';
+import Navbar from './Navbar';
+import Sidebar from './Sidebar';
+import Sidebars from './Sidebars';
+import CalendarTable from './CalendarTable';
+import HomePage from './HomePage';
+import TeamTable from './TeamTable';
+import EmployeeList from './EmployeeList';
+import EmployeeDetail from './EmployeeDetail';
+import LoginForm from './LoginForm';
+import './App.css';
+import EmployeeDashboard from './EmployeeDashboard';
+import ManagerDashboard from './ManagerDashboard';
+import Dashboard from './Dashboard';
+import UpdateTimesheet from './UpdateTimesheet';
+import ViewTimesheet from './ViewTimesheet';
+
+const App = () => {
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [empid, setEmpid] = useState(null);
+  const [loggedInEmpId, setLoggedInEmpId] = useState(null);
+  const [email, setEmail] = useState('');
+  const [employeeName, setEmployeeName] = useState('');
+  const [userRole, setUserRole] = useState('employee');
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  const handleLogin = (empid) => {
+    setEmpid(empid);
+    setIsLoggedIn(true);
+    axios.get(`http://127.0.0.1:8000/api/employee-details1/${empid}/`)
+      .then(response => {
+        setEmployeeName(response.data.employee_name);
+        setEmail(response.data.email);
+        setUserRole(response.data.position);
+        setLoggedInEmpId(response.data.emp_id);
+      })
+      .catch(error => {
+        console.error('There was an error fetching the employee details!', error);
+      });
+  };
+
+  useEffect(() => {
+    if (empid) {
+      axios.get(`http://127.0.0.1:8000/api/employee-details1/${empid}/`)
+        .then(response => {
+          setEmployeeName(response.data.employee_name);
+          setEmail(response.data.email);
+          setUserRole(response.data.position);
+        })
+        .catch(error => {
+          console.error('There was an error fetching the employee details!', error);
+        });
+    }
+  }, [empid]);
+
+  const handleCalendarClick = () => {
+    navigate('/calendar');
+  };
+
+  const handleSelectEmployee = (employeeId) => {
+    navigate(`/employees/${employeeId}`);
+  };
+
+  if (!isLoggedIn) {
+    return <LoginForm onLogin={handleLogin} />;
+  }
+
+  const showSidebar = !location.pathname.startsWith('/dashboard');
+
+  return (
+    <div className="app">
+      <Navbar />
+      <div className="main-content-container">
+        {showSidebar ? (
+          <Sidebar onCalendarClick={handleCalendarClick} />
+        ) : (
+          <Sidebars onCalendarClick={handleCalendarClick} />
+        )}
+        <div className="main-content">
+          <Routes>
+            <Route path="/login" element={<LoginForm onLogin={handleLogin} />} />
+            <Route path="/dashboard/*" element={<Dashboard empid={empid} employeeName={employeeName} email={email}/>} />
+            <Route path="/employee-dashboard" element={<EmployeeDashboard />} />
+            <Route path="/manager-dashboard" element={<ManagerDashboard />} />
+            <Route path="/home" element={<HomePage employeeName={employeeName} empid={empid} email={email} />} />
+            <Route path="/calendar" element={<CalendarTable empid={empid} employeeName={employeeName} />} />
+            <Route path="/employees" element={<EmployeeList onSelectEmployee={handleSelectEmployee} />} />
+            <Route path="/employees/:id" element={<EmployeeDetail userRole={userRole} />} />
+            <Route path="/teamtable" element={<TeamTable />} />
+            <Route path="/profile" element={<HomePage empid={empid} employeeName={employeeName} email={email}/>} />
+            <Route path="/update-timesheet" element={<UpdateTimesheet />} />
+            <Route path="/view-timesheet" element={<ViewTimesheet empid={empid} />} />
+          </Routes>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default App;
+
+
+
+
+
+
+
+
+
+
+import React, { useState } from 'react';
+import './CalendarTable.css';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faSmile } from '@fortawesome/free-solid-svg-icons';
+
+const CalendarTable = ({ empid, employeeName }) => {
+  const rows = Array.from({ length: 6 });
+  const columns = Array.from({ length: 5 });
+  const [hours, setHours] = useState(Array(30).fill([]));
+
+  const getRandomColor = () => {
+    const letters = '0123456789ABCDEF';
+    let color = '#';
+    for (let i = 0; i < 6; i++) {
+      color += letters[Math.floor(Math.random() * 16)];
+    }
+    return color;
+  };
+
+  const addHours = (index, newHours) => {
+    const updatedHours = [...hours];
+    updatedHours[index] = [
+      ...updatedHours[index],
+      { hours: newHours, color: getRandomColor() }
+    ];
+    setHours(updatedHours);
+  };
+
+  const isWeekend = (index) => {
+    const dayOfWeek = (index + 1) % 7;
+    return dayOfWeek === 0 || dayOfWeek === 6;
+  };
+
+  return (
+    <div className="calendar-table">
+      <div className="header">
+        <span>Name: {employeeName}</span>
+        <span>Employee ID: {empid}</span>
+        <span>Month: July</span>
+        <span>Year: 2024</span>
+      </div>
+      <table>
+        <tbody>
+          {rows.map((_, rowIndex) => (
+            <tr key={rowIndex}>
+              {columns.map((_, colIndex) => {
+                const index = rowIndex * 5 + colIndex;
+                return (
+                  <td key={colIndex}>
+                    <div className="cell-content">
+                      <span className="date">{index + 1}</span>
+                      <button
+                        className="add-hours"
+                        onClick={() => {
+                          const newHours = prompt('Enter worked hours:');
+                          if (newHours && !isNaN(newHours)) {
+                            addHours(index, parseInt(newHours, 10));
+                          }
+                        }}
+                      >
+                        +
+                      </button>
+                      <div className="hours-circles">
+                        {hours[index].map((entry, i) => (
+                          <div
+                            key={i}
+                            className="hours-circle"
+                            style={{ backgroundColor: entry.color }}
+                          >
+                            {entry.hours}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </td>
+                );
+              })}
+              <td>
+                {isWeekend(rowIndex * 5 + columns.length) ? (
+                  <span>Weekend</span>
+                ) : (
+                  <FontAwesomeIcon icon={faSmile} />
+                )}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+};
+
+export default CalendarTable;
+
+
+
+
+
+
+
+
+import React, { useEffect } from 'react';
+import { Routes, Route } from 'react-router-dom';
+import CalendarTable from './CalendarTable';
+import TeamTable from './TeamTable';
+import HomePage from './HomePage';
+import UpdateTimesheet from './UpdateTimesheet';
+import ViewTimesheet from './ViewTimesheet';
+import axios from 'axios';
+
+const Dashboard = ({ empid, employeeName,email}) => {
+  useEffect(() => {
+    if (empid) {
+      axios.get(`http://127.0.0.1:8000/api/employee-details/${empid}`)
+        .then(response => {
+          // Assuming the API response contains the employee name.
+          // This state update should be handled in the parent component (App.js).
+        })
+        .catch(error => {
+          console.error('There was an error fetching the employee details!', error);
+        });
+    }
+  }, [empid]);
+
+  return (
+    <div className="dashboard-container">
+      <div className="main-content">
+        <Routes>
+        <Route path="/profile" element={<HomePage empid={empid} employeeName={employeeName} email={email}/>} />
+          <Route path="update-timesheet" element={<UpdateTimesheet />} />
+          <Route path="view-timesheet" element={<ViewTimesheet empid={empid} />} />
+          <Route path="/calendar" element={<CalendarTable empid={empid} employeeName={employeeName} />} />
+          <Route path="teamtable" element={<TeamTable />} />
+        </Routes>
+      </div>
+    </div>
+  );
+};
+
+export default Dashboard;
+
+
+
+
+
+
+import React, { useEffect, useState } from 'react';
+import axios from 'axios';
+import { Bar } from 'react-chartjs-2';
+import 'chart.js/auto';
+import './HomePage.css'; // Ensure you have a CSS file for styling
+
+const HomePage = ({ employeeName, empid, email }) => {
+  const [daysInfo, setDaysInfo] = useState({
+    total_days: 0,
+    working_days: 0,
+    leave_days: 0,
+  });
+  const [percentage, setPercentage] = useState(0);
+
+  useEffect(() => {
+    axios.get(`http://127.0.0.1:8000/api/user-details/${empid}/`)
+      .then(response => {
+        setDaysInfo(response.data);
+        const workDays = response.data.working_days;
+        const totalDays = response.data.total_days;
+        const attendancePercentage = (workDays / totalDays) * 100;
+        setPercentage(attendancePercentage);
+      })
+      .catch(error => {
+        console.error('Error fetching user details:', error);
+      });
+  }, [empid]);
+
+  const data = {
+    labels: ['January', 'February', 'March', 'April', 'May', 'June'],
+    datasets: [
+      {
+        label: 'Attendance Percentage',
+        data: [65, 59, 80, 81, 56, 55],
+        backgroundColor: 'rgba(75, 192, 192, 0.6)',
+        borderColor: 'rgba(75, 192, 192, 1)',
+        borderWidth: 1,
+      },
+    ],
+  };
+
+  const options = {
+    responsive: true,
+    scales: {
+      y: {
+        beginAtZero: true,
+      },
+    },
+  };
+
+  return (
+    <div className="home-page">
+      <h1>Welcome, {employeeName} <span role="img" aria-label="smile">😊</span></h1>
+      <p>ID: {empid}</p>
+      <p>Email: {email}</p>
+      <p>Total Days: {daysInfo.total_days}</p>
+      <p>Working Days: {daysInfo.working_days}</p>
+      <p>Leave Days: {daysInfo.leave_days}</p>
+      <div className="content-container">
+        <div className="chart-container">
+          <Bar data={data} options={options} />
+        </div>
+        <div className="circular-progress-container">
+          <div className="circular-progress">
+            <div className="circle">
+              <div className="mask full" style={{ transform: `rotate(${1.8 * percentage}deg)` }}>
+                <div className="fill" style={{ transform: `rotate(${1.8 * percentage}deg)` }}></div>
+              </div>
+              <div className="mask half">
+                <div className="fill" style={{ transform: `rotate(${1.8 * percentage}deg)` }}></div>
+              </div>
+              <div className="inside-circle">{percentage.toFixed(2)}%</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default HomePage;
+
+
+
+
+
+import React from 'react';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faClock, faHome, faFileAlt, faChartBar, faTasks, faStar, faUsers, faDollarSign, faCogs } from '@fortawesome/free-solid-svg-icons';
+import { Link } from 'react-router-dom';
+import './Sidebar.css';
+
+const Sidebar = ({ onCalendarClick }) => {
+  return (
+    <div className="sidebar">
+      <div className="sidebar-title">
+        <FontAwesomeIcon icon={faClock} />
+        <span>TIME TITANS</span>
+      </div>
+      <div className="sidebar-search">
+        <input type="text" placeholder="Search..." />
+      </div>
+      <div className="sidebar-menu">
+        <div className="sidebar-item">
+          <FontAwesomeIcon icon={faHome} />
+          <span><Link to="/home" className="sidebar-link">Home Page</Link></span>
+        </div>
+        <div className="sidebar-item">
+          <FontAwesomeIcon icon={faFileAlt} />
+          <span>All Pages</span>
+        </div>
+        <div className="sidebar-item">
+          <FontAwesomeIcon icon={faChartBar} />
+          <span>Reports</span>
+        </div>
+        <div className="sidebar-item">
+          <FontAwesomeIcon icon={faTasks} />
+          <span><Link to="/calendar" className="sidebar-link">Task</Link></span>
+        </div>
+        <div className="sidebar-item">
+          <FontAwesomeIcon icon={faStar} />
+          <span><Link to="/teamtable" className="sidebar-link">Team</Link></span>
+        </div>
+        <div className="sidebar-item">
+          <FontAwesomeIcon icon={faUsers} />
+          <span><Link to="/employees" className="sidebar-link">Employees</Link></span>
+        </div>
+        <div className="sidebar-item">
+          <FontAwesomeIcon icon={faDollarSign} />
+          <span>Revenue</span>
+        </div>
+        <div className="sidebar-item">
+          <FontAwesomeIcon icon={faCogs} />
+          <span>Settings</span>
+        </div>
+      </div>
+      <button className="timesheet-button" onClick={onCalendarClick}>TIMESHEET</button>
+    </div>
+  );
+};
+
+export default Sidebar;
+
+
+
+
+
+
+
+
+
+import React from 'react';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faClock, faHome, faFileAlt, faChartBar, faTasks, faStar, faUsers, faDollarSign, faCogs } from '@fortawesome/free-solid-svg-icons';
+import { Link } from 'react-router-dom';
+ 
+
+const Sidebars = ({ onCalendarClick }) => {
+  return (
+    <div className="sidebar">
+      <div className="sidebar-title">
+        <FontAwesomeIcon icon={faClock} />
+        <span>TIME TITANS</span>
+      </div>
+      <div className="sidebar-search">
+        <input type="text" placeholder="Search..." />
+      </div>
+      <div className="sidebar-menu">
+        <div className="sidebar-item">
+          <FontAwesomeIcon icon={faHome} />
+          <span><Link to="/dashboard/profile" className="sidebar-link">Profile</Link></span>
+        </div>
+        <div className="sidebar-item">
+          <FontAwesomeIcon icon={faFileAlt} />
+          <span><Link to="/dashboard/update-timesheet" className="sidebar-link">Add Timesheet</Link></span>
+        </div>
+        <div className="sidebar-item">
+          <FontAwesomeIcon icon={faChartBar} />
+          <span><Link to="/dashboard/view-timesheet" className="sidebar-link">View Timesheet</Link></span>
+        </div>
+        <div className="sidebar-item">
+          <FontAwesomeIcon icon={faTasks} />
+          <span><Link to="/dashboard/calendar" className="sidebar-link">Calendar</Link></span>
+        </div>
+        <div className="sidebar-item">
+          <FontAwesomeIcon icon={faStar} />
+          <span><Link to="/dashboard/teamtable" className="sidebar-link">Team Table</Link></span>
+        </div>
+      </div>
+      <button className="timesheet-button" onClick={onCalendarClick}>TIMESHEET</button>
+    </div>
+  );
+};
+
+export default Sidebars;
+
+
+
+
+
+
+
+
+
+
+
+import React, { useEffect, useState } from 'react';
+import axios from 'axios';
+import './ViewTimesheet.css';
+
+const ViewTimesheet = () => {
+  const [timesheets, setTimesheets] = useState([]);
+  const [loggedInEmpId, setLoggedInEmpId] = useState(''); // Initialize with an empty string
+
+  useEffect(() => {
+    // Simulate fetching logged-in employee ID
+    const fetchLoggedInEmpId = () => {
+      // Replace with actual logic to get logged-in employee ID (e.g., from local storage or context)
+      const empId = '123'; // Example employee ID
+      setLoggedInEmpId(empId);
+    };
+
+    fetchLoggedInEmpId();
+  }, []);
+
+  useEffect(() => {
+    if (loggedInEmpId) {
+      axios.get(`http://127.0.0.1:8000/api/employee-details/?emp_id=${loggedInEmpId}`)
+        .then(response => {
+          setTimesheets(response.data);
+        })
+        .catch(error => {
+          console.error('Error fetching timesheets:', error);
+        });
+    }
+  }, [loggedInEmpId]);
+
+  return (
+    <div className="view-timesheet-container">
+      <h2>View Timesheet</h2>
+      {timesheets.length > 0 ? (
+        <table>
+          <thead>
+            <tr>
+              <th>Employee ID</th>
+              <th>Employee Name</th>
+              <th>Start Time</th>
+              <th>End Time</th>
+              <th>Project Name</th>
+              <th>Total Hours Worked</th>
+            </tr>
+          </thead>
+          <tbody>
+            {timesheets.map((sheet) => (
+              <tr key={sheet.id}>
+                <td>{sheet.emp_id}</td>
+                <td>{sheet.employee_name}</td>
+                <td>{sheet.start_time}</td>
+                <td>{sheet.end_time}</td>
+                <td>{sheet.project_name}</td>
+                <td>{sheet.total_hours_worked}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      ) : (
+        <p>No timesheets found for the logged-in employee.</p>
+      )}
+    </div>
+  );
+};
+
+export default ViewTimesheet;
+
+
+
+
+
+
+
+
+
+from django.db import models
+from django.contrib.auth.models import AbstractBaseUser, BaseUserManager
+from django.utils import timezone
+from datetime import datetime, timedelta
+
+class UserManager(BaseUserManager):
+    def create_user(self, username, email, emp_id, position, joining_date, password=None):
+        if not email:
+            raise ValueError('Users must have an email address')
+        user = self.model(
+            username=username,
+            email=self.normalize_email(email),
+            emp_id=emp_id,
+            position=position,
+            joining_date=joining_date
+        )
+        user.set_password(password)
+        user.save(using=self._db)
+        return user
+
+    def create_superuser(self, username, email, emp_id, position, joining_date, password=None):
+        user = self.create_user(
+            username=username,
+            email=email,
+            emp_id=emp_id,
+            position=position,
+            joining_date=joining_date,
+            password=password
+        )
+        user.is_admin = True
+        user.save(using=self._db)
+        return user
+
+    def calculate_days(self, specific_date):
+        today = specific_date
+        total_days = (today - self.joining_date).days
+        working_days = self.calculate_working_days(today)
+        leave_days = total_days - working_days
+        return {
+            'total_days': total_days,
+            'working_days': working_days,
+            'leave_days': leave_days
+        }
+
+    def calculate_working_days(self, end_date):
+        # Assuming EmployeeDetail holds the records of days worked
+        workdays = EmployeeDetail.objects.filter(
+            emp_id=self,
+            date__gte=self.joining_date,
+            date__lte=end_date
+        ).count()
+        return workdays
+class User(AbstractBaseUser):
+    POSITION_CHOICES = [
+        ('employee', 'Employee'),
+        ('lead', 'Lead'),
+        ('manager', 'Manager'),
+    ]
+
+    username = models.CharField(max_length=30, unique=True)
+    email = models.EmailField(max_length=255, unique=True)
+    emp_id = models.CharField(max_length=10, unique=True, primary_key=True)
+    is_active = models.BooleanField(default=True)
+    is_admin = models.BooleanField(default=False)
+    Time_stamp = models.DateTimeField(default=timezone.now)
+    position = models.CharField(max_length=10, choices=POSITION_CHOICES, default='employee')
+    joining_date = models.DateField()
+
+    objects = UserManager()
+
+    USERNAME_FIELD = 'username'
+    REQUIRED_FIELDS = ['email', 'emp_id', 'position', 'joining_date']
+
+    def __str__(self):
+        return self.emp_id
+
+    def has_perm(self, perm, obj=None):
+        return self.is_admin
+
+    def has_module_perms(self, app_label):
+        return self.is_admin
+
+class Project(models.Model):
+    STATUS_CHOICES = [
+        ('pending', 'Pending'),
+        ('approved', 'Approved'),
+        ('rejected', 'Rejected'),
+    ]
+
+    emp_id = models.ForeignKey(User, on_delete=models.CASCADE)
+    project_name = models.CharField(max_length=100)
+    project_module = models.CharField(max_length=100)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
+    timestamp = models.DateTimeField(default=timezone.now)
+
+    def __str__(self):
+        return f"{self.project_name} ({self.emp_id.emp_id})"
+
+class EmployeeDetail(models.Model):
+    emp_id = models.ForeignKey(User, on_delete=models.CASCADE)
+    employee_name = models.CharField(max_length=100)
+    start_time = models.TimeField()
+    end_time = models.TimeField()
+    project_name = models.CharField(max_length=100, editable=False)
+    comments = models.TextField()
+    date = models.DateField()
+    total_hours_worked = models.DecimalField(max_digits=5, decimal_places=2)
+    lead_approval = models.CharField(max_length=20, choices=[('approved', 'Approved'), ('rejected', 'Rejected'),
+                                                             ('pending', 'Pending')], default='pending')
+    manager_approval = models.CharField(max_length=20, choices=[('approved', 'Approved'), ('rejected', 'Rejected'),
+                                                                ('pending', 'Pending')], default='pending')
+
+    def __str__(self):
+        return self.employee_name
+
+    def save(self, *args, **kwargs):
+        # Fetch the project name from Project model
+        project = Project.objects.filter(emp_id=self.emp_id).first()
+        if project:
+            self.project_name = project.project_name
+        super().save(*args, **kwargs)
+
+
+
+
+
+
+
+
+
+from rest_framework import serializers
+from .models import User, EmployeeDetail, Project
+from django.contrib.auth.password_validation import validate_password
+
+class RegisterSerializer(serializers.ModelSerializer):
+    password = serializers.CharField(write_only=True, required=True, validators=[validate_password])
+    joining_date = serializers.DateField()
+
+    class Meta:
+        model = User
+        fields = ('username', 'email', 'emp_id', 'position', 'joining_date', 'password')
+
+    def create(self, validated_data):
+        user = User.objects.create_user(
+            username=validated_data['username'],
+            email=validated_data['email'],
+            emp_id=validated_data['emp_id'],
+            position=validated_data['position'],
+            joining_date=validated_data['joining_date'],
+            password=validated_data['password']
+        )
+        return user
+
+class UserSerializer(serializers.ModelSerializer):
+    days_info = serializers.SerializerMethodField()
+    specific_date = serializers.DateField(write_only=True, required=False)
+    class Meta:
+        model = User
+        fields = ['username', 'email', 'emp_id', 'position', 'joining_date', 'days_info', 'specific_date']
+        extra_kwargs = {
+            'password': {'write_only': True},
+            'Time_stamp': {'read_only': True},
+            'joining_date': {'read_only': True}
+        }
+
+    def get_days_info(self, obj):
+        specific_date = self.context['request'].data.get('specific_date', date.today())
+        return obj.calculate_days(specific_date)
+    def create(self, validated_data):
+        user = User.objects.create_user(
+            username=validated_data['username'],
+            email=validated_data['email'],
+            emp_id=validated_data['emp_id'],
+            position=validated_data['position'],
+            password=validated_data['password']
+        )
+        return user
+
+class EmployeeDetailSerializer(serializers.ModelSerializer):
+    emp_id = serializers.PrimaryKeyRelatedField(queryset=User.objects.all())
+    emp_id_display = serializers.CharField(source='emp_id.emp_id', read_only=True)
+
+    class Meta:
+        model = EmployeeDetail
+        fields = '__all__'
+        read_only_fields = ('project_name',)
+
+    def update(self, instance, validated_data):
+        instance.lead_approval = validated_data.get('lead_approval', instance.lead_approval)
+        instance.manager_approval = validated_data.get('manager_approval', instance.manager_approval)
+        instance.save()
+        return instance
+
+class LoginSerializer(serializers.Serializer):
+    emp_id = serializers.CharField()
+    password = serializers.CharField(write_only=True)
+
+class ProjectSerializer(serializers.ModelSerializer):
+    emp_id = serializers.PrimaryKeyRelatedField(queryset=User.objects.all())
+    emp_id_display = serializers.CharField(source='emp_id.emp_id', read_only=True)
+
+    class Meta:
+        model = Project
+        fields = ['emp_id', 'project_name', 'project_module', 'status', 'timestamp']
+
+
+
+
+
+
+
+
+
+
+# myapp/urls.py
+from django.urls import path
+from .views import UserDetailsView
+from .views import LoginView, RegisterView, EmployeeDetailView, EmployeeDetailByEmpIDView, EmployeeListView,EmployeeDetailByEmpIDView1,UpdateApprovalView
+
+urlpatterns = [
+    path('login/', LoginView.as_view(), name='login'),
+    path('register/', RegisterView.as_view(), name='register'),
+    path('employee-details/', EmployeeDetailView.as_view(), name='employee-list'),
+    path('employee-details/<emp_id>/', EmployeeDetailByEmpIDView.as_view(), name='employee-detail'),
+path('employee-details1/<emp_id>/', EmployeeDetailByEmpIDView1.as_view(), name='employee-detail'),
+ path('employee-details/<str:pk>/update_approval/', UpdateApprovalView.as_view(), name='update-approval'),  # Updated this line
+path('user-details/<str:emp_id>/', UserDetailsView.as_view(), name='user-details'),
+
+]
+
+
+
+
+
+
+from django.http import JsonResponse
+from django.shortcuts import render
+from django.contrib.auth import login as auth_login, logout as auth_logout, authenticate
+from rest_framework import status, generics, viewsets
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework import status
+from rest_framework.response import Response
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import AllowAny
+import logging
+from django.utils import timezone
+from datetime import timedelta
+from rest_framework.views import APIView
+from myapp.models import User
+
+from .models import User, EmployeeDetail, Project
+from .serializers import RegisterSerializer, EmployeeDetailSerializer, LoginSerializer, UserSerializer, ProjectSerializer
+
+logger = logging.getLogger(__name__)
+
+class RegisterView(generics.CreateAPIView):
+    queryset = User.objects.all()
+    permission_classes = (AllowAny,)
+    serializer_class = RegisterSerializer
+
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        self.perform_create(serializer)
+        return Response({"message": "You have successfully registered"}, status=status.HTTP_201_CREATED)
+
+class LoginView(generics.CreateAPIView):
+    permission_classes = (AllowAny,)
+    serializer_class = LoginSerializer
+
+    def post(self, request):
+        serializer = LoginSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        emp_id = serializer.validated_data['emp_id']
+        password = serializer.validated_data['password']
+
+        try:
+            user = User.objects.get(emp_id=emp_id)
+            if user.check_password(password):
+                position = user.position
+                redirect_url = '/'
+                if position == 'employee':
+                    redirect_url = '/dashboard/profile/'
+                elif position == 'lead':
+                    redirect_url = '/lead-dashboard/'
+                elif position == 'manager':
+                    redirect_url = '/home/'
+                return Response({'redirect_url': redirect_url}, status=status.HTTP_200_OK)
+            else:
+                return Response({'error': 'Invalid credentials'}, status=status.HTTP_400_BAD_REQUEST)
+        except User.DoesNotExist:
+            return Response({'error': 'User not found'}, status=status.HTTP_400_BAD_REQUEST)
+
+class EmployeeDetailView(generics.ListCreateAPIView):
+    serializer_class = EmployeeDetailSerializer
+    permission_classes = (AllowAny,)
+
+    def get_queryset(self):
+        emp_id = self.request.query_params.get('emp_id', None)
+        if emp_id:
+            return EmployeeDetail.objects.filter(emp_id=emp_id)
+        return EmployeeDetail.objects.all()
+
+class EmployeeDetailByEmpIDView(generics.RetrieveAPIView):
+    queryset = EmployeeDetail.objects.all()
+    serializer_class = EmployeeDetailSerializer
+    permission_classes = (AllowAny,)
+    lookup_field = 'emp_id'
+
+    def patch(self, request, *args, **kwargs):
+        emp_id = self.kwargs.get('emp_id')
+        employee_detail = self.get_object()
+        serializer = self.get_serializer(employee_detail, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        self.perform_update(serializer)
+        return Response(serializer.data)
+class EmployeeDetailByEmpIDView1(generics.RetrieveAPIView):
+    queryset = User.objects.all()
+    serializer_class = UserSerializer
+    permission_classes = (AllowAny,)
+    lookup_field = 'emp_id'
+
+    def patch(self, request, *args, **kwargs):
+        emp_id = self.kwargs.get('emp_id')
+        user_detail = self.get_object()
+        serializer = self.get_serializer(user_detail, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        self.perform_update(serializer)
+        return Response(serializer.data)
+
+class EmployeeListView(generics.ListAPIView):
+    queryset = EmployeeDetail.objects.all()
+    serializer_class = EmployeeDetailSerializer
+
+    def get_employee_details(request):
+        employee_details = list(EmployeeDetail.objects.values(
+            'emp_id',
+            'employee_name',
+            'start_time',
+            'end_time',
+            'project_name',
+            'lead_approval'
+        ))
+        return JsonResponse(employee_details, safe=False)
+
+class EmployeeDetailViewSet(viewsets.ModelViewSet):
+    queryset = EmployeeDetail.objects.all()
+    serializer_class = EmployeeDetailSerializer
+
+    def update_approval(self, request, pk=None):
+        try:
+            employee = self.get_object()
+            serializer = EmployeeDetailSerializer(employee, data=request.data, partial=True)
+            if serializer.is_valid():
+                serializer.save()
+                return Response(serializer.data)
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+class UpdateApprovalView(APIView):
+    permission_classes = (AllowAny,)
+
+    def post(self, request, pk):
+        try:
+            employee_detail = EmployeeDetail.objects.get(pk=pk)
+            action = request.data.get("action")
+            if action not in ['approve', 'reject']:
+                return Response({"error": "Invalid action"}, status=status.HTTP_400_BAD_REQUEST)
+            if request.data.get('userRole') == 'lead':
+                employee_detail.lead_approval = 'approved' if action == 'approve' else 'rejected'
+                employee_detail.save()
+                return Response({"message": f"Lead approval updated to {employee_detail.lead_approval}"}, status=status.HTTP_200_OK)
+            else:
+                employee_detail.manager_approval = 'approved' if action == 'approve' else 'rejected'
+                employee_detail.save()
+                return Response({"message": f"Manager approval updated to {employee_detail.manager_approval}"}, status=status.HTTP_200_OK)
+        except EmployeeDetail.DoesNotExist:
+            return Response({"error": "Employee detail not found"}, status=status.HTTP_404_NOT_FOUND)
+
+class ProjectViewSet(viewsets.ModelViewSet):
+    queryset = Project.objects.all()
+    serializer_class = ProjectSerializer
+
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        self.perform_create(serializer)
+        headers = self.get_success_headers(serializer.data)
+        return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
+
+    def update(self, request, *args, **kwargs):
+        return super().update(request, *args, **kwargs)
+
+    def partial_update(self, request, *args, **kwargs):
+        return super().partial_update(request, *args, **kwargs)
+
+    def destroy(self, request, *args, **kwargs):
+        return super().destroy(request, *args, **kwargs)
+
+
+class UserDetailsView(APIView):
+    def get(self, request, emp_id):
+        try:
+            user = User.objects.get(emp_id=emp_id)
+            days_info = user.calculate_days()
+            data = {
+                'employee_name': user.username,
+                'emp_id': user.emp_id,
+                'email': user.email,
+                'joining_date': user.joining_date,
+                'days_info': days_info
+            }
+            return Response(data)
+        except User.DoesNotExist:
+            return Response({'error': 'User not found'}, status=404)
