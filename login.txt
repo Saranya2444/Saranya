@@ -1,0 +1,56 @@
+// src/components/LoginForm.js
+import React, { useState } from 'react';
+import axios from 'axios';
+import { useNavigate } from 'react-router-dom';
+import './LoginForm.css';
+
+const LoginForm = ({ onLogin }) => {
+  const [empId, setEmpId] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+  const navigate = useNavigate();
+
+  const handleLogin = async (e) => {
+    e.preventDefault();
+    try {
+      const response = await axios.post('http://127.0.0.1:8000/api/login/', {
+        emp_id: empId,
+        password: password,
+      });
+      const { redirect_url } = response.data;
+      onLogin(empId);
+      navigate(redirect_url);
+    } catch (error) {
+      setError('Invalid credentials. Please try again.');
+    }
+  };
+
+  return (
+    <form onSubmit={handleLogin}>
+      <div>
+        <label htmlFor="empId">Employee ID</label>
+        <input
+          type="text"
+          id="empId"
+          value={empId}
+          onChange={(e) => setEmpId(e.target.value)}
+          required
+        />
+      </div>
+      <div>
+        <label htmlFor="password">Password</label>
+        <input
+          type="password"
+          id="password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          required
+        />
+      </div>
+      {error && <p>{error}</p>}
+      <button type="submit">Login</button>
+    </form>
+  );
+};
+
+export default LoginForm;
